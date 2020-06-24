@@ -18,25 +18,24 @@ layout = (
         dcc.Dropdown(
             id="dataset-dropdown",
             options=[
-                {"label": "circles", "value": "circles",},
-                {"label": "moons", "value": "moons",},
-                {"label": "blobs", "value": "blobs",},
-                {"label": "no structure", "value": "no structure",},
-                {"label": "aniso", "value": "aniso",},
-                {"label": "varied", "value": "varied",},
-            ]
+                {"label": x, "value": x}
+                for x in ["circles", "moons", "blobs", "no structure", "aniso", "varied"]
+            ],
         ),
+        html.Br(),
         dbc.Row([
+            dbc.Col( [
+                html.Span("n samples:"),
+            ], id="n-samples-label", width=2),
             dbc.Col([
-                html.Span("n clusters: (kmeans)"),
-            ], width=2),
-            dbc.Col([
-                dcc.Input(
-                    id="n-clusters-input",
-                    type="number",
-                    value=3,
+                dcc.Slider(
+                    id="n-samples-input",
+                    value=700,
+                    min=300,
+                    max=1000,
+                    step=50,
                 ),
-            ], width=3),
+            ], width=5),
         ]),
         dbc.Row([
             dbc.Col([
@@ -76,15 +75,13 @@ from app import app
     Output("graphs", "children"),
     [Input("submit-button", "n_clicks"),],
     [
+        State("n-samples-input", "value"),
         State("dataset-dropdown", "value"),
         State("epsilon-input", "value"),
         State("neighbors-input", "value"),
-        State("n-clusters-input", "value"),
     ],
 )
-def update_graphs(clicks, dataset, eps, neighbors_input, n_clusters):
-
-    n_samples = 700
+def update_graphs(clicks, n_samples, dataset, eps, neighbors_input):
 
     default_base = {
         'n_neighbors': 10,
@@ -93,25 +90,31 @@ def update_graphs(clicks, dataset, eps, neighbors_input, n_clusters):
 
     if dataset == "circles": 
         data = datasets.make_circles(n_samples=n_samples, factor=0.5, noise=0.05)
+        n_clusters = 2
 
     elif dataset == "moons":
         data = datasets.make_moons(n_samples=n_samples, noise=0.05)
+        n_clusters = 2
 
     elif dataset == "blobs":
-        data = datasets.make_blobs(n_samples=n_samples, random_state=511)
+        data = datasets.make_blobs(n_samples=n_samples)
+        n_clusters = 3
 
     elif dataset == "no structure":
         data = np.random.rand(n_samples, 2), None
+        n_clusters = 3
 
     elif dataset == "aniso":
 
-        X, y = datasets.make_blobs(n_samples=n_samples, random_state=511)
+        X, y = datasets.make_blobs(n_samples=n_samples)
         transformation = [[0.6, -0.6], [-0.4, 0.8]]
         X_aniso = np.dot(X, transformation)
         data = (X_aniso, y)
+        n_clusters = 3
 
     elif dataset == "varied":
-        data = datasets.make_blobs(n_samples=n_samples, cluster_std=[1.0, 2.5, 0.5], random_state=511)
+        data = datasets.make_blobs(n_samples=n_samples, cluster_std=[1.0, 2.5, 0.5])
+        n_clusters = 3
 
     else:
         return []
@@ -151,4 +154,15 @@ def update_graphs(clicks, dataset, eps, neighbors_input, n_clusters):
         dcc.Graph(figure=fig_actual),
         dcc.Graph(figure=fig_kmeans),
         dcc.Graph(figure=fig_dbscan),
+    ]
+
+@app.callback(
+    Output("n-samples-label", "children"),
+    [
+        Input("n-samples-input", "value"),
+    ]
+)
+def update_slider(n_samples):
+    return [
+        html.Span(f"n samples: ({n_samples})")
     ]

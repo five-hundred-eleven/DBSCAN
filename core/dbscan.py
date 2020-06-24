@@ -33,18 +33,20 @@ class DBSCAN:
             N = list(neighbors)
             while j < len(N):
                 Q = N[j]
+                Q_tuple = tuple(Q)
                 j += 1
-                if self.__getLabel(Q) == -1:
-                    self.__setLabel(Q, count)
-                if self.__getLabel(Q) is not None:
+                if self.__getLabel(Q_tuple) == -1:
+                    self.__setLabel(Q_tuple, count)
+                if self.__getLabel(Q_tuple) is not None:
                     continue
-                self.__setLabel(Q, count)
+                self.__setLabel(Q_tuple, count)
                 neighbors = self.__rangeQuery(points, Q)
                 if len(neighbors) >= self.__minpts:
                     for R in neighbors:
-                        if tuple(R) in S:
+                        R_tuple = tuple(R)
+                        if R_tuple in S:
                             continue
-                        S.add(tuple(R))
+                        S.add(R_tuple)
                         N.append(R)
             
         self.labels_ = [self.__getLabel(P) for P in points]
