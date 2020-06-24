@@ -7,6 +7,7 @@ from dash.dependencies import Input, Output, State
 from sklearn import cluster, datasets
 from sklearn.preprocessing import StandardScaler
 import random
+from itertools import islice, cycle
 
 import time
 
@@ -139,12 +140,17 @@ def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed)
     else:
         return []
 
+    colors = np.array(list(islice(cycle(['#377eb8', '#ff7f00', '#4daf4a',
+                                         '#f781bf', '#a65628', '#984ea3',
+                                         '#999999', '#e41a1c', '#dede00']),
+                                      int(127))) + ["#000", "#000"])
+
     X, y = data
 
     X = StandardScaler().fit_transform(X)
     
     fig_actual = go.Figure(
-        go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": y}),
+        go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": colors[y]}),
     )
     fig_actual.update_layout(title="Actual Groups", width=500, height=500)
 
@@ -153,7 +159,7 @@ def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed)
     t2 = time.clock()
 
     fig_kmeans = go.Figure(
-        go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": labels})
+        go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": colors[labels]})
     )
     fig_kmeans.update_layout(title=f"Sklearn DBSCAN: {t2-t1:.3f} seconds", width=500, height=500)
 
@@ -162,7 +168,7 @@ def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed)
     clustering.fit(X)
     t2 = time.clock()
 
-    labels = [label if label != -1 else "#000" for label in clustering.labels_]
+    labels = colors[clustering.labels_-1]
 
     fig_dbscan = go.Figure(
         go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": labels},)
