@@ -1,17 +1,17 @@
 import numpy as np
 from collections import defaultdict
+from sklearn.neighbors import KDTree
 
 
-class DBSCAN:
+class BaseDBSCAN:
     
     def __init__(self, eps=0.2, minpts=4, distfunc=(lambda p1, p2: np.linalg.norm(p1-p2))):
-        # TODO behavior for eps="auto"
-        assert eps == "auto" or type(eps) in (int, float)
+        assert type(eps) in (int, float)
         assert type(minpts) is int
         assert callable(distfunc)
-        self.__eps = eps
+        self._eps = eps
         self.__distfunc = distfunc
-        self.__minpts = minpts
+        self._minpts = minpts+1
     
     def fit(self, points):
         count = 0
@@ -20,8 +20,8 @@ class DBSCAN:
             # the point has already been processed in the inner loop
             if self.__getLabel(P) is not None:
                 continue
-            neighbors = self.__rangeQuery(points, P)
-            if len(neighbors) < self.__minpts:
+            neighbors = self._rangeQuery(points, P)
+            if len(neighbors) < self._minpts:
                 self.__setLabel(P, -1) # point is noise
                 continue
             
@@ -40,8 +40,8 @@ class DBSCAN:
                 if self.__getLabel(Q_tuple) is not None:
                     continue
                 self.__setLabel(Q_tuple, count)
-                neighbors = self.__rangeQuery(points, Q)
-                if len(neighbors) >= self.__minpts:
+                neighbors = self._rangeQuery(points, Q)
+                if len(neighbors) >= self._minpts:
                     for R in neighbors:
                         R_tuple = tuple(R)
                         if R_tuple in S:
@@ -59,10 +59,31 @@ class DBSCAN:
     
     def __setLabel(self, P, val):
         self.__labels[tuple(P)] = val
-    
-    def __rangeQuery(self, points, P):
+
+class DBSCAN(BaseDBSCAN):
+    def _rangeQuery(self, points, P):
+        """
+            Naive implementation of a rangescan function which calculates the distance between
+            the point and every other point.
+        """
         neighbors = []
         for Q in points:
-            if self.__distfunc(P, Q) <= self.__eps:
+            if self.__distfunc(P, Q) <= self._eps:
                 neighbors.append(Q)
         return neighbors
+
+class OptimizedDBSCAN(BaseDBSCAN):
+    
+    def __init__(self, eps=0.2, minpts=4):
+        super().__init__(eps=eps, minpts=minpts, distfunc=lambda: None)
+    
+    def fit(self, points):
+        self.__tree = KDTree(points)
+        return super().fit(points)
+    
+    def _rangeQuery(self, points, P):
+        """
+            Optimized version of the rangeQuery function which uses a kd tree.
+        """
+        ind, = self.__tree.query_radius([P], self._eps)
+        return points[ind]

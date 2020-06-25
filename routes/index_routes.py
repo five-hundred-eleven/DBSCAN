@@ -13,7 +13,7 @@ import time
 
 import plotly.graph_objects as go
 
-from core.dbscan import DBSCAN
+from core.dbscan import DBSCAN, OptimizedDBSCAN
 
 layout = (
     html.Div([
@@ -100,6 +100,13 @@ from app import app
     ],
 )
 def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed):
+    """
+        Chunks of this code are taken from https://scikit-learn.org/stable/auto_examples/cluster/plot_linkage_comparison.html
+        for making blobs of certain shapes and sizes.
+
+        This function takes user input and uses them to show updated graphs of the actual groups, sklearn.dbscan groups,
+        and my homebrew dbscan groups.
+    """
 
     default_base = {
         'n_neighbors': 10,
@@ -135,11 +142,14 @@ def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed)
         n_clusters = 3
 
     elif dataset == "3D blobs":
-        return blobs_3d(n_samples, eps, neighbors_input, random_seed)
+        data = datasets.make_blobs(n_samples=n_samples, n_features=3, cluster_std=[1.0, 2.5, 0.5], random_state=random_seed)
+        n_clusters = 3
+
 
     else:
         return []
 
+    # colors array: last 2 are black, representing noise
     colors = np.array(list(islice(cycle(['#377eb8', '#ff7f00', '#4daf4a',
                                          '#f781bf', '#a65628', '#984ea3',
                                          '#999999', '#e41a1c', '#dede00']),
@@ -147,84 +157,78 @@ def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed)
 
     X, y = data
 
+    # scale the data to an approximately standard size
     X = StandardScaler().fit_transform(X)
     
-    fig_actual = go.Figure(
-        go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": colors[y]}),
-    )
+    # actual data
+    if dataset != "3D blobs":
+        fig_actual = go.Figure(
+            go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": colors[y]}),
+        )
+    else:
+        fig_actual = go.Figure(
+            go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], mode="markers", marker={"color": colors[y]}),
+        )
     fig_actual.update_layout(title="Actual Groups", width=500, height=500)
 
+    # time this operation
     t1 = time.clock()
+    kmeans = cluster.KMeans(n_clusters=n_clusters).fit(X)
+    t2 = time.clock()
+
+    if dataset != "3D blobs":
+        fig_kmeans = go.Figure(
+            go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": colors[kmeans.labels_]})
+        )
+    else:
+        fig_kmeans = go.Figure(
+            go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], mode="markers", marker={"color": colors[kmeans.labels_]})
+        )
+
+    fig_kmeans.update_layout(title=f"Sklearn Kmeans: {t2-t1:.3f} seconds", width=500, height=500)
+
+    # time this operation
+    t1 = time.clock()
+    # sklearn dbscan
     _, labels = cluster.dbscan(X, eps=eps, min_samples=neighbors_input)
     t2 = time.clock()
 
-    fig_kmeans = go.Figure(
-        go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": colors[labels]})
-    )
-    fig_kmeans.update_layout(title=f"Sklearn DBSCAN: {t2-t1:.3f} seconds", width=500, height=500)
+    if dataset != "3D blobs":
+        fig_sklearn_dbscan = go.Figure(
+            go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": colors[labels]})
+        )
+    else:
+        fig_sklearn_dbscan = go.Figure(
+            go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], mode="markers", marker={"color": colors[labels]})
+        )
+    fig_sklearn_dbscan.update_layout(title=f"Sklearn DBSCAN: {t2-t1:.3f} seconds", width=500, height=500)
 
+    # time this operation
     t1 = time.clock()
-    clustering = DBSCAN(eps=eps, minpts=neighbors_input)
+    # dbscan clustering
+    clustering = OptimizedDBSCAN(eps=eps, minpts=neighbors_input)
     clustering.fit(X)
     t2 = time.clock()
 
     labels = colors[clustering.labels_-1]
 
-    fig_dbscan = go.Figure(
-        go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": labels},)
-    )
+    if dataset != "3D blobs":
+        fig_dbscan = go.Figure(
+            go.Scatter(x=X[:, 0], y=X[:, 1], mode="markers", marker={"color": labels},)
+        )
+    else:
+        fig_dbscan = go.Figure(
+            go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], mode="markers", marker={"color": labels},)
+        )
+
     fig_dbscan.update_layout(title=f"Homebrew DBSCAN: {t2-t1:.3f} seconds", width=500, height=500)
 
     return [
         dcc.Graph(figure=fig_actual),
         dcc.Graph(figure=fig_kmeans),
+        dcc.Graph(figure=fig_sklearn_dbscan),
         dcc.Graph(figure=fig_dbscan),
     ]
-
-def blobs_3d(n_samples, eps, neighbors_input, random_seed):
-    """
-        Makes 3d blobs and returns graphs
-    """
-    data = datasets.make_blobs(n_samples=n_samples, n_features=3, cluster_std=[1.0, 2.5, 0.5], random_state=random_seed)
-    n_clusters = 3
-
-    X, y = data
-
-    X = StandardScaler().fit_transform(X)
-    
-    fig_actual = go.Figure(
-        go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], mode="markers", marker={"color": y}),
-    )
-    fig_actual.update_layout(title="Actual Groups", width=500, height=500)
-
-    t1 = time.clock()
-    clustering = cluster.KMeans(n_clusters=n_clusters)
-    clustering.fit(X)
-    t2 = time.clock()
-
-    fig_kmeans = go.Figure(
-        go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], mode="markers", marker={"color": clustering.labels_})
-    )
-    fig_kmeans.update_layout(title=f"K-Means Predictions: {t2-t1:.3f} seconds", width=500, height=500)
-
-    t1 = time.clock()
-    clustering = DBSCAN(eps=eps, minpts=neighbors_input)
-    clustering.fit(X)
-    t2 = time.clock()
-
-    labels = [label if label != -1 else "#000" for label in clustering.labels_]
-
-    fig_dbscan = go.Figure(
-        go.Scatter3d(x=X[:, 0], y=X[:, 1], z=X[:, 2], mode="markers", marker={"color": labels},)
-    )
-    fig_dbscan.update_layout(title=f"DBSCAN Predictions: {t2-t1:.3f} seconds", width=500, height=500)
-
-    return [
-        dcc.Graph(figure=fig_actual),
-        dcc.Graph(figure=fig_kmeans),
-        dcc.Graph(figure=fig_dbscan),
-    ]
-
 
 @app.callback(
     Output("n-samples-label", "children"),
@@ -244,4 +248,7 @@ def update_slider(n_samples):
     ],
 )
 def randomize_seed(n_clicks):
+    """
+        randomize the seed input.
+    """
     return random.randint(100, 2**31-1)
