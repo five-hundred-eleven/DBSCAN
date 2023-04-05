@@ -1,8 +1,8 @@
 import numpy as np
 import dash
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc
+from dash import html
 from dash.dependencies import Input, Output, State
 from sklearn import cluster, datasets
 from sklearn.preprocessing import StandardScaler
@@ -172,9 +172,9 @@ def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed)
     fig_actual.update_layout(title="Actual Groups", width=500, height=500)
 
     # time this operation
-    t1 = time.clock()
+    t1 = time.perf_counter()
     kmeans = cluster.KMeans(n_clusters=n_clusters).fit(X)
-    t2 = time.clock()
+    t2 = time.perf_counter()
 
     if dataset != "3D blobs":
         fig_kmeans = go.Figure(
@@ -188,10 +188,10 @@ def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed)
     fig_kmeans.update_layout(title=f"Sklearn Kmeans: {t2-t1:.3f} seconds", width=500, height=500)
 
     # time this operation
-    t1 = time.clock()
+    t1 = time.perf_counter()
     # sklearn dbscan
     _, labels = cluster.dbscan(X, eps=eps, min_samples=neighbors_input)
-    t2 = time.clock()
+    t2 = time.perf_counter()
 
     if dataset != "3D blobs":
         fig_sklearn_dbscan = go.Figure(
@@ -204,11 +204,11 @@ def update_graphs(clicks, n_samples, dataset, eps, neighbors_input, random_seed)
     fig_sklearn_dbscan.update_layout(title=f"Sklearn DBSCAN: {t2-t1:.3f} seconds", width=500, height=500)
 
     # time this operation
-    t1 = time.clock()
+    t1 = time.perf_counter()
     # dbscan clustering
     clustering = OptimizedDBSCAN(eps=eps, minpts=neighbors_input)
     clustering.fit(X)
-    t2 = time.clock()
+    t2 = time.perf_counter()
 
     labels = colors[clustering.labels_-1]
 
