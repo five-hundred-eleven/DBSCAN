@@ -10,4 +10,4 @@ deploy: build
 	heroku container:release web --app ecowley-dbscan
 
 clean:
-	docker kill dbscan-test
+	docker kill dbscan_test
